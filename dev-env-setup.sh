@@ -109,6 +109,4 @@ else
   echo "~/projects directory already exists"
 fi
 
-# add fzf to .bashrc but only if it's not already there
-
-grep -Fxq 'eval "$(fzf --bash)"' "$HOME/.bashrc" || echo 'eval "$(fzf --bash)"' >> "$HOME/.bashrc"
+source $HOME/.bashrc
