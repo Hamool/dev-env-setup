@@ -48,11 +48,16 @@ install_packages() {
 if [[ "${PACKAGES[@]}" =~ "fzf" ]]; then 
   echo "Building fzf from source"
   remove_package "fzf"
+  fzf_home=$HOME/.fzf
   if [[ ! -d $HOME/.fzf ]]; then
-    git clone --depth 1 https://github.com/junegunn/fzf.git $HOME/.fzf
-    $HOME/.fzf/install --all
+    git clone --depth 1 https://github.com/junegunn/fzf.git $fzf_home
+    $fzf_home/install --all
   else
     echo "fzf already cloned to $HOME/.fzf"
+    cd $fzf_home
+    git pull
+    $fzf_home/install --all
+    cd -
   fi
 fi
 
