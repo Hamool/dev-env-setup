@@ -1,0 +1,7 @@
+tmux
+nvim
+fzf
+git
+htop
+wget
+curl
