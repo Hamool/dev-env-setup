@@ -1,12 +1,25 @@
 #! /bin/bash
 
-# TODO:
-#
-# - install nvim, tmux, git, htop, wget, curl, fzf
-# - add fzf to bashrc
-# - create ~/projects directory
+set -euo pipefail
 
-# update package db
+trap 'echo "[ERROR] Script failed at line $LINENO. Check $LOGFILE for details." >&2' ERR
+# enable logging 
+
+trap 'if [[ $STATUS == "ok" ]]; then
+          echo "=== Setup finished successfully at $(date) ===";
+          exit 0
+      fi' EXIT
+
+LOGFILE="$HOME/dev-env-setup.log"
+
+if [ -f "$LOGFILE" ] && [ $(wc -l < "$LOGFILE") -gt 1000 ]; then
+  mv "$LOGFILE" "$LOGFILE.$(date +%Y%m%d-%H%M%S)" 
+fi
+
+exec > >(tee -a "$LOGFILE") 2>&1
+echo ""
+echo "=== Run started at $(date) ==="
+
 
 echo "Updating package database"
 if command -v apt >/dev/null 2>&1; then 
@@ -110,3 +123,5 @@ else
 fi
 
 source $HOME/.bashrc
+
+STATUS="ok"
