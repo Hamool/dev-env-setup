@@ -105,6 +105,27 @@ update_and_build() {
     fi
 }
 
+set_custom_prompt() {
+    local profile_file="$HOME/.bashrc"
+
+    if ! grep -q "__git_ps1" "$profile_file"; then
+        cat >> "$profile_file" <<'EOF'
+
+# Custom DevOps Prompt
+if [ -f /usr/share/git/completion/git-prompt.sh ]; then
+    source /usr/share/git/completion/git-prompt.sh
+elif [ -f /etc/bash_completion.d/git-prompt ]; then
+    source /etc/bash_completion.d/git-prompt
+fi
+
+PS1="\[\e[0;32m\]\u@\h \[\e[0;34m\]\w\[\e[0;33m\]\$(__git_ps1 ' (%s)')\[\e[0m\] \$ "
+EOF
+        echo "Custom prompt added to $profile_file"
+    else
+        echo "Custom prompt already configured"
+    fi
+}
+
 detect_os
 detect_package_manager
 eval "$UPDATE_CMD"
@@ -144,9 +165,9 @@ if [[ "${PACKAGES[@]}" =~ "nvim" ]]; then
   nvim_home=$HOME/nvim_src
   update_and_build \
     "https://github.com/neovim/neovim.git " \
-    "$nvim_home" \
-    make CMAKE_BUILD_TYPE=Release \
-    sudo make install
+    "$fzf_home" \
+  make CMAKE_BUILD_TYPE=Release \
+  sudo make install
 fi
 
 # update package database and install packages
@@ -166,6 +187,7 @@ else
   echo "~/projects directory already exists"
 fi
 
+set_custom_prompt
 source $HOME/.bashrc
 
 STATUS="ok"
