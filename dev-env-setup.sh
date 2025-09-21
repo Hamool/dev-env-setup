@@ -188,6 +188,6 @@ else
 fi
 
 set_custom_prompt
-source $HOME/.bashrc
+echo "Run 'source ~/.bashrc' or open a new terminal to see your new prompt."
 
 STATUS="ok"
