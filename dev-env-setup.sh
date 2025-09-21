@@ -76,6 +76,35 @@ detect_package_manager() {
   echo ">>> Using package manager: $PM"
 }
 
+update_and_build() {
+    local repo_url="$1"
+    local dest_dir="$2"
+    shift 2
+    local build_cmds=("$@")
+
+    if [[ ! -d "$dest_dir/.git" ]]; then
+        echo "Cloning repository: $repo_url → $dest_dir"
+        git clone "$repo_url" "$dest_dir"
+        cd "$dest_dir"
+        "${build_cmds[@]}"
+        cd -
+    else
+        echo "Updating repository in $dest_dir"
+        cd "$dest_dir"
+        OLD_HASH=$(git rev-parse HEAD)
+        git pull --quiet
+        NEW_HASH=$(git rev-parse HEAD)
+
+        if [[ "$OLD_HASH" != "$NEW_HASH" ]]; then
+            echo "New commits found → running build commands"
+            "${build_cmds[@]}"
+        else
+            echo "Already up-to-date → skipping build"
+        fi
+        cd -
+    fi
+}
+
 detect_os
 detect_package_manager
 eval "$UPDATE_CMD"
@@ -84,23 +113,18 @@ if [[ "${PACKAGES[@]}" =~ "fzf" ]]; then
   echo "Building fzf from source"
   remove_package "fzf"
   fzf_home=$HOME/.fzf
-  if [[ ! -d $HOME/.fzf ]]; then
-    git clone --depth 1 https://github.com/junegunn/fzf.git $fzf_home
-    $fzf_home/install --all
-  else
-    echo 'fzf already cloned to $fzf_home'
-    cd $fzf_home
-    git pull
-    $fzf_home/install --all
-    cd -
-  fi
+  
+  update_and_build \
+    "https://github.com/junegunn/fzf.git" \
+    "$fzf_home" \
+    ./install --all
 fi
 
 if [[ "${PACKAGES[@]}" =~ "nvim" ]]; then
   echo "Building nvim from source"
   remove_package "nvim"
 
-  # Install build dependencies (Debian/Ubuntu/Fedora/Arch)
+  # Install build dependencies (Debian/Ubuntu/Fedora/Arch/Artix/MacOS)
   if command -v apt >/dev/null 2>&1; then
     sudo apt install -y ninja-build gettext cmake unzip curl build-essential
   elif command -v dnf >/dev/null 2>&1; then
@@ -118,14 +142,11 @@ if [[ "${PACKAGES[@]}" =~ "nvim" ]]; then
   fi
 
   nvim_home=$HOME/nvim_src
-  if [[ ! -d "$nvim_home" ]]; then
-    git clone https://github.com/neovim/neovim.git "$nvim_home"
-  fi
-  cd $nvim_home
-  git pull
-  make CMAKE_BUILD_TYPE=Release
-  sudo make install
-  cd -
+  update_and_build \
+    "https://github.com/neovim/neovim.git " \
+    "$nvim_home" \
+    make CMAKE_BUILD_TYPE=Release \
+    sudo make install
 fi
 
 # update package database and install packages
