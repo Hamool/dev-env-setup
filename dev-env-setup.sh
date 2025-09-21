@@ -20,21 +20,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 echo ""
 echo "=== Run started at $(date) ==="
 
-
-echo "Updating package database"
-if command -v apt >/dev/null 2>&1; then 
-  sudo apt update -y
-elif command -v dnf >/dev/null 2>&1; then 
-  sudo dnf check-update -y || true
-elif command -v pacman >/dev/null 2>&1; then 
-  sudo pacman -Sy --noconfirm
-fi
-
-TO_INSTALL=()
-
 mapfile -t PACKAGES < packages.txt
-
-# build fzf from source and add config to bashrc
 
 remove_package() {
   local remove=$1
@@ -48,15 +34,51 @@ remove_package() {
   PACKAGES=("${new_pkgs[@]}")
 }
 
-install_packages() {
-  if command -v apt >/dev/null 2>&1; then 
-    sudo apt install -y $1
-  elif command -v dnf >/dev/null 2>&1; then 
-    sudo dnf install -y $1
-  elif command -v pacman >/dev/null 2>&1; then 
-    sudo pacman -S --noconfirm $1
-  fi
+detect_os() {
+    if [[ "$(uname)" == "Darwin" ]]; then
+        OS="macOS"
+    elif [[ -f /etc/os-release ]]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        OS="$NAME $VERSION_ID"
+    else
+        OS="Unknown"
+    fi
 }
+
+detect_package_manager() {
+  if command -v apt >/dev/null 2>&1; then 
+    PM="apt"
+    UPDATE_CMD="sudo apt update -y"
+    INSTALL_CMD="sudo apt install -y"
+  elif command -v dnf >/dev/null 2>&1; then 
+    PM="dnf"
+    UPDATE_CMD="sudo dnf check-update -y"
+    INSTALL_CMD="sudo dnf install -y"
+  elif command -v pacman >/dev/null 2>&1; then 
+    PM="pacman"
+    UPDATE_CMD="sudo pacman -Sy --noconfirm"
+    INSTALL_CMD="sudo pacman -S --noconfirm"
+  elif command -v apk >/dev/null 2>&1; then 
+    PM="apk"
+    UPDATE_CMD="sudo apk update"
+    INSTALL_CMD="sudo apk add"
+  elif command -v brew >/dev/null 2>&1; then 
+    PM="brew"
+    UPDATE_CMD="brew update"
+    INSTALL_CMD="brew install"
+  else
+    echo "Unsupported package manager. Aborting."
+    exit 1
+  fi
+
+  echo ">>> Detected OS: $OS"
+  echo ">>> Using package manager: $PM"
+}
+
+detect_os
+detect_package_manager
+eval "$UPDATE_CMD"
 
 if [[ "${PACKAGES[@]}" =~ "fzf" ]]; then 
   echo "Building fzf from source"
@@ -66,7 +88,7 @@ if [[ "${PACKAGES[@]}" =~ "fzf" ]]; then
     git clone --depth 1 https://github.com/junegunn/fzf.git $fzf_home
     $fzf_home/install --all
   else
-    echo "fzf already cloned to $HOME/.fzf"
+    echo 'fzf already cloned to $fzf_home'
     cd $fzf_home
     git pull
     $fzf_home/install --all
@@ -85,32 +107,33 @@ if [[ "${PACKAGES[@]}" =~ "nvim" ]]; then
     sudo dnf install -y ninja-build libtool gcc make cmake curl unzip gettext
   elif command -v pacman >/dev/null 2>&1; then
     sudo pacman -S --noconfirm base-devel cmake unzip ninja curl gettext
+  elif command -v apk >/dev/null 2>&1; then
+    sudo apk add --no-cache \
+      build-base cmake curl unzip gettext-tiny gettext-tiny-dev lua5.1-dev
+  elif command -v brew >/dev/null 2>&1; then
+    brew install ninja cmake gettext curl unzip
+    brew link gettext --force
   else
-    echo "⚠️  Unknown package manager. Please install Neovim build deps manually."
+    echo "Unknown package manager. Please install Neovim build deps manually."
   fi
 
   nvim_home=$HOME/nvim_src
   if [[ ! -d "$nvim_home" ]]; then
     git clone https://github.com/neovim/neovim.git "$nvim_home"
   fi
-    cd $nvim_home
-    git pull
-    make CMAKE_BUILD_TYPE=Release
-    sudo make install
-    cd -
+  cd $nvim_home
+  git pull
+  make CMAKE_BUILD_TYPE=Release
+  sudo make install
+  cd -
 fi
 
-for pkg in "${PACKAGES[@]}"; do
-  if ! command -v "$pkg" >/dev/null 2>&1; then
-    TO_INSTALL+=("$pkg")
-  fi
-done
-if [ ! ${#TO_INSTALL[@]} -gt 0 ]; then 
+# update package database and install packages
+if [ ! ${#PACKAGES[@]} -gt 0 ]; then 
   echo "Nothing to install"
 else
-  install_packages ${PACKAGES[@]}
+  eval "$INSTALL_CMD ${PACKAGES[@]}"
 fi
-# update package database and install packages
 
 
 # create ~/projects dir if it doesn't exist
